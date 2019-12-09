@@ -1,7 +1,7 @@
 # %load network.py
 
 """
-network.py
+networksteep.py
 ~~~~~~~~~~
 IT WORKS
 
@@ -19,9 +19,11 @@ import random
 # Third-party libraries
 import numpy as np
 
-class Network(object):
 
-    def __init__(self, sizes, st=1):
+class Network(object):
+    
+
+    def __init__(self, sizes):
         """The list ``sizes`` contains the number of neurons in the
         respective layers of the network.  For example, if the list
         was [2, 3, 1] then it would be a three-layer network, with the
@@ -32,21 +34,21 @@ class Network(object):
         layer is assumed to be an input layer, and by convention we
         won't set any biases for those neurons, since biases are only
         ever used in computing the outputs from later layers."""
+        self.steepener = 0
         self.num_layers = len(sizes)
         self.sizes = sizes
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x)
                         for x, y in zip(sizes[:-1], sizes[1:])]
-        self.step = st
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
         for b, w in zip(self.biases, self.weights):
-            a = sigmoid(np.dot(w, a)+b,self.step )
+            a = sigmoid(np.dot(w, a)+b, self.steepener)
         return a
 
     def SGD(self, training_data, epochs, mini_batch_size, eta,
-            test_data=None):
+            test_data=None,drop_in=False):
         """Train the neural network using mini-batch stochastic
         gradient descent.  The ``training_data`` is a list of tuples
         ``(x, y)`` representing the training inputs and the desired
@@ -55,27 +57,86 @@ class Network(object):
         network will be evaluated against the test data after each
         epoch, and partial progress printed out.  This is useful for
         tracking progress, but slows things down substantially."""
-
+        
         training_data = list(training_data)
         n = len(training_data)
-
+        
         if test_data:
             test_data = list(test_data)
             n_test = len(test_data)
+            
+            
+      # np.savetxt(ws.txt, self.weights)
+      # np.savetxt(bx.txt, self.biases)
 
         for j in range(epochs):
+            
+            self.steepener+=1
             random.shuffle(training_data)
             mini_batches = [
                 training_data[k:k+mini_batch_size]
                 for k in range(0, n, mini_batch_size)]
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta)
+                self.update_mini_batch(mini_batch, eta, drop_in=drop_in)
             if test_data:
                 print("Epoch {} : {} / {}".format(j,self.evaluate(test_data),n_test));
             else:
                 print("Epoch {} complete".format(j))
+            
+        '''   
+        f = open("ws1.txt", "a")
+        g = open("ws2.txt", "a")
+        
+        h = open("bs1.txt", "a")
+        i = open("bs2.txt", "a")
+       
+        np.savetxt(f, self.weights[0])
+        np.savetxt(g, self.weights[1])
+        
+        np.savetxt(h, self.biases[0])
+        np.savetxt(i, self.biases[1])
+      
+        f.close()
+        g.close()
+        h.close()
+        i.close()
+        '''
+        
+        
+       
+        '''
+        x = [0.001, 0.005, 0.01, 0.05, 0.1]
+        
+        for i in range(len(x)):
+        
+            weights10 = self.weights[0].copy()
+            weights10[(weights10 > -x[i]) & (weights10 <= x[i])] = 0.0
+            weights11 = self.weights[1].copy()
+            weights11[(weights11 > -x[i]) & (weights11 <= x[i])] = 0.0
+            
+            self.weights = [weights10, weights11]
+            print("Epoch with dropped weights around {}: {} / {}".format(x[i], self.evaluate(test_data),n_test));
+            r = len(weights10[weights10 == 0.0]) + len(weights11[weights11 == 0.0])
+            print("sparsity: " , r, " / 23820 = "  , (r/23820) * 100 , "%" )
+            #maybe retrain after this? several times? would zero weights stay zero
+            #prune until you notice the effect and retrain?
+            
+            #also add checkpointing
+            
+        f = open("ws1.txt", "a")
+        g = open("ws2.txt", "a")
+        
+       
+        np.savetxt(f, self.weights[0])
+        np.savetxt(g, self.weights[1])
+      
+        f.close()
+        g.close()
+        
+    
+        '''
 
-    def update_mini_batch(self, mini_batch, eta):
+    def update_mini_batch(self, mini_batch, eta, drop_in=False, track=None):
         """Update the network's weights and biases by applying
         gradient descent using backpropagation to a single mini batch.
         The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
@@ -86,9 +147,17 @@ class Network(object):
             delta_nabla_b, delta_nabla_w = self.backprop(x, y)
             nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
-        #to retain 0 weights
+        if drop_in:
+            print(delta_nabla_w[0])
+            cutoff = 0.000000001
+            print("o", len(self.weights[0][(delta_nabla_w[0] < cutoff) & (delta_nabla_w[0] > -cutoff) & (delta_nabla_w !=0.0)]), "+", len(self.weights[1][(delta_nabla_w[1] < cutoff) & (delta_nabla_w[1] > -cutoff)]))
+            self.weights[0][(delta_nabla_w[0] < cutoff) & (delta_nabla_w[0] > -cutoff)] = 0.0
+            self.weights[1][(delta_nabla_w[1] < cutoff) & (delta_nabla_w[1] > -cutoff)] = 0.0
         nabla_w[0][self.weights[0]==0.0] = 0.0
         nabla_w[1][self.weights[1]==0.0] = 0.0
+    
+        if track:
+            track[nabla_w > thresh] = 1
         self.weights = [w-(eta/len(mini_batch))*nw
                         for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
@@ -108,7 +177,7 @@ class Network(object):
         for b, w in zip(self.biases, self.weights):
             z = np.dot(w, activation)+b
             zs.append(z)
-            activation = sigmoid(z, step=self.step)
+            activation = sigmoid(z, self.steepener)
             activations.append(activation)
         # backward pass
         delta = self.cost_derivative(activations[-1], y) * \
@@ -144,18 +213,19 @@ class Network(object):
         return (output_activations-y)
     
     def copy(net):
-        net2 = Network(net.sizes,st=net.step)
+        net2 = Network(net.sizes)
         net2.weights = net.weights
         net2.biases = net.biases
         return net2
 
 #### Miscellaneous functions
-def sigmoid(z, step=1):
+def sigmoid(z, step):
     """The sigmoid function."""
-    if step == 30:
+    if step >= 29:
+        #might it make a signficant difference if this was z>=0?
         return 1 * (z > 0)
-    return 1.0/(1.0+np.exp(step * -z))
+    return 1.0/(1.0+np.exp(- z * step))
 
 def sigmoid_prime(z):
     """Derivative of the sigmoid function."""
-    return sigmoid(z)*(1-sigmoid(z))
+    return sigmoid(z, 1)*(1-sigmoid(z, 1))

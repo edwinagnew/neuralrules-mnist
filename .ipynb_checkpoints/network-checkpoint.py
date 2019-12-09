@@ -153,6 +153,7 @@ class Network(object):
 def sigmoid(z, step=1):
     """The sigmoid function."""
     if step == 30:
+        #might it make a signficant difference if this was z>=0?
         return 1 * (z > 0)
     return 1.0/(1.0+np.exp(step * -z))
 

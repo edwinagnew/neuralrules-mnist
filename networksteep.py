@@ -48,7 +48,7 @@ class Network(object):
         return a
 
     def SGD(self, training_data, epochs, mini_batch_size, eta,
-            test_data=None):
+            test_data=None,drop_in=False):
         """Train the neural network using mini-batch stochastic
         gradient descent.  The ``training_data`` is a list of tuples
         ``(x, y)`` representing the training inputs and the desired
@@ -71,72 +71,62 @@ class Network(object):
 
         for j in range(epochs):
             
-            self.steepener=j+1
+            self.steepener+=1
             random.shuffle(training_data)
             mini_batches = [
                 training_data[k:k+mini_batch_size]
                 for k in range(0, n, mini_batch_size)]
             for mini_batch in mini_batches:
-                self.update_mini_batch(mini_batch, eta)
+                self.update_mini_batch(mini_batch, eta, drop_in=drop_in)
             if test_data:
                 print("Epoch {} : {} / {}".format(j,self.evaluate(test_data),n_test));
             else:
                 print("Epoch {} complete".format(j))
             
-        '''   
-        f = open("ws1.txt", "a")
-        g = open("ws2.txt", "a")
-        
-        h = open("bs1.txt", "a")
-        i = open("bs2.txt", "a")
-       
-        np.savetxt(f, self.weights[0])
-        np.savetxt(g, self.weights[1])
-        
-        np.savetxt(h, self.biases[0])
-        np.savetxt(i, self.biases[1])
       
-        f.close()
-        g.close()
-        h.close()
-        i.close()
-        '''
+    def SGD_special(self, training_data, epochs, mini_batch_size, eta,
+            test_data=None):
         
+        training_data = list(training_data)
+        n = len(training_data)
         
-       
-        '''
-        x = [0.001, 0.005, 0.01, 0.05, 0.1]
-        
-        for i in range(len(x)):
-        
-            weights10 = self.weights[0].copy()
-            weights10[(weights10 > -x[i]) & (weights10 <= x[i])] = 0.0
-            weights11 = self.weights[1].copy()
-            weights11[(weights11 > -x[i]) & (weights11 <= x[i])] = 0.0
+        if test_data:
+            test_data = list(test_data)
+            n_test = len(test_data)
             
-            self.weights = [weights10, weights11]
-            print("Epoch with dropped weights around {}: {} / {}".format(x[i], self.evaluate(test_data),n_test));
-            r = len(weights10[weights10 == 0.0]) + len(weights11[weights11 == 0.0])
-            print("sparsity: " , r, " / 23820 = "  , (r/23820) * 100 , "%" )
-            #maybe retrain after this? several times? would zero weights stay zero
-            #prune until you notice the effect and retrain?
             
-            #also add checkpointing
-            
-        f = open("ws1.txt", "a")
-        g = open("ws2.txt", "a")
-        
-       
-        np.savetxt(f, self.weights[0])
-        np.savetxt(g, self.weights[1])
-      
-        f.close()
-        g.close()
-        
-    
-        '''
+      # np.savetxt(ws.txt, self.weights)
+      # np.savetxt(bx.txt, self.biases)
+        last_acc = 0.9
 
-    def update_mini_batch(self, mini_batch, eta):
+        for j in range(epochs):
+            
+            self.steepener+=1
+            random.shuffle(training_data)
+            mini_batches = [
+                training_data[k:k+mini_batch_size]
+                for k in range(0, n, mini_batch_size)]
+            for mini_batch in mini_batches:
+                self.update_mini_batch(mini_batch, eta, drop_in=drop_in)
+            if test_data:
+                new_acc = self.evaluate(test_data)
+                print("Epoch {} : {} / {}".format(j,new_acc,n_test))
+                if(last_acc - new_acc > 0.08):
+                    self.sizes[1] += 1
+                    self.weights[0].append(np.random.rand(784) * 0.001)
+                    self.weights[1].append(np.random.rand(784) * 0.001)
+                    self.biases[0].append(np.random.rand(784))
+                    self.biases[1].append(np.random.rand(784))
+                    
+                    #then sparsen
+                    
+                    j -= 1
+                    self.steepener -= 1
+            else:
+                print("Epoch {} complete".format(j))
+        
+        
+    def update_mini_batch(self, mini_batch, eta, drop_in=False, track=None):
         """Update the network's weights and biases by applying
         gradient descent using backpropagation to a single mini batch.
         The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
@@ -147,8 +137,17 @@ class Network(object):
             delta_nabla_b, delta_nabla_w = self.backprop(x, y)
             nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
+        if drop_in:
+            print(delta_nabla_w[0])
+            cutoff = 0.000000001
+            print("o", len(self.weights[0][(delta_nabla_w[0] < cutoff) & (delta_nabla_w[0] > -cutoff) & (delta_nabla_w !=0.0)]), "+", len(self.weights[1][(delta_nabla_w[1] < cutoff) & (delta_nabla_w[1] > -cutoff)]))
+            self.weights[0][(delta_nabla_w[0] < cutoff) & (delta_nabla_w[0] > -cutoff)] = 0.0
+            self.weights[1][(delta_nabla_w[1] < cutoff) & (delta_nabla_w[1] > -cutoff)] = 0.0
         nabla_w[0][self.weights[0]==0.0] = 0.0
         nabla_w[1][self.weights[1]==0.0] = 0.0
+    
+        if track:
+            track[nabla_w > thresh] = 1
         self.weights = [w-(eta/len(mini_batch))*nw
                         for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
@@ -212,7 +211,7 @@ class Network(object):
 #### Miscellaneous functions
 def sigmoid(z, step):
     """The sigmoid function."""
-    if step == 30:
+    if step >= 29:
         #might it make a signficant difference if this was z>=0?
         return 1 * (z > 0)
     return 1.0/(1.0+np.exp(- z * step))

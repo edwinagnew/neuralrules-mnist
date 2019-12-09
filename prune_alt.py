@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sun Oct 27 21:29:42 2019
+Created on Sun Nov 24 16:29:02 2019
 
 @author: edwinagnew
 """
@@ -13,17 +13,19 @@ import mnist_loader
 
 
 
-def prune_retrain(net, region, threshold=0.001):
+
+
+def prune_retrain_alt(net, start=0.3, threshold=0.001):
     pnet = net.copy()
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
     training_data = list(training_data)
     test_data = list(test_data)
 
 
+    region = start
     acc = net.evaluate(test_data) / len(test_data) #gonna use the same test data each time?
     d_acc = 0
     next_net = network.Network(net.sizes)
-    print(next_net.sizes, pnet.sizes)
     next_net.weights = pnet.weights
     next_net.biases = pnet.biases
 
@@ -38,7 +40,6 @@ def prune_retrain(net, region, threshold=0.001):
         weights10[(weights10 > -region) & (weights10 <= region)] = 0.0
         weights11 = pnet.weights[1].copy()
         weights11[(weights11 > -region) & (weights11 <= region)] = 0.0
-    
         fin = [weights10, weights11]
         if len(pnet.weights) > 2:
             weights12 = pnet.weights[2].copy()
@@ -51,11 +52,11 @@ def prune_retrain(net, region, threshold=0.001):
         d_acc = acc - new_acc
         print(new_acc, " around region ±", region)
         acc = new_acc
-        region+=region
+        region+=start
         
     
     
-    pnet.SGD(training_data, 2, 10, 3.0)
+    pnet.SGD(training_data, 5, 10, 3.0)
     ''' f = open("wsp1.txt", "a")
     g = open("wsp2.txt", "a")
         
@@ -73,7 +74,7 @@ def prune_retrain(net, region, threshold=0.001):
     h.close()
     i.close() '''
         
-    print("Epoch with pruned weights around {}: {} / {}".format(region/2, pnet.evaluate(test_data),len(test_data)));       
+    print("Epoch with pruned weights around {}: {} / {}".format(region - start, pnet.evaluate(test_data),len(test_data)));       
     weights10 = pnet.weights[0]
     weights11 = pnet.weights[1]
     r = len(weights10[weights10 == 0.0]) + len(weights11[weights11 == 0.0])
@@ -82,7 +83,3 @@ def prune_retrain(net, region, threshold=0.001):
         r+= len(weights12[weights12 == 0.0])
     print("sparsity: " , r, " / 23820 = "  , (r/23820) * 100 , "%" )
     return pnet
-    
-
-    
-
