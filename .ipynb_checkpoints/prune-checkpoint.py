@@ -11,13 +11,37 @@ import numpy as np
 
 import mnist_loader
 
-
+def prune_to(net, sparsity):
+    pnet = net.copy()
+    training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
+    training_data = list(training_data)
+    test_data = list(test_data)
+    validation_data = list(validation_data)
+    
+    all_weights = np.asarray([item for sublist in pnet.weights for subsub in sublist for item in subsub])
+    thresh = np.percentile(np.absolute(all_weights), sparsity)
+    
+    
+    for i in range(len(net.weights)):
+        pnet.weights[i][(pnet.weights[i] > -thresh) & (pnet.weights[i] <= thresh)] = 0.0
+   
+    new_acc = pnet.evaluate(validation_data)
+    print(new_acc, " around region ±", threshold)
+    
+    pnet.SGD(training_data, 2, 10, 3.0)
+    
+    sp, total = get_sparsity(pnet)
+    print("sparsity: ", sp/total)
+    print("Epoch with pruned weights around {}: {} / {}".format(thresh, pnet.evaluate(validation_data),len(validation_data))) 
+    
+    return pnet
 
 def prune_retrain(net, region, threshold=0.001):
     pnet = net.copy()
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
     training_data = list(training_data)
     test_data = list(test_data)
+    validation_data = list(validation_data)
 
 
     acc = net.evaluate(test_data) / len(test_data) #gonna use the same test data each time?
@@ -74,15 +98,18 @@ def prune_retrain(net, region, threshold=0.001):
     i.close() '''
         
     print("Epoch with pruned weights around {}: {} / {}".format(region/2, pnet.evaluate(test_data),len(test_data)));       
-    weights10 = pnet.weights[0]
-    weights11 = pnet.weights[1]
-    r = len(weights10[weights10 == 0.0]) + len(weights11[weights11 == 0.0])
-    if len(pnet.weights) > 2:
-        weights12 = pnet.weights[2]
-        r+= len(weights12[weights12 == 0.0])
-    print("sparsity: " , r, " / 23820 = "  , (r/23820) * 100 , "%" )
+    r, total = get_sparsity(pnet)
+    print("sparsity: " , r, " / " , total, " = "  , (r/total) * 100 , "%" )
     return pnet
     
 
-    
+def get_sparsity(net):
+    sparsity = 0
+    total_weights = 0
+    for i in range(len(net.weights)):
+        layer = net.weights[i]
+        sparsity += len(layer[layer == 0.0])
+        total_weights += len(layer.flatten())
 
+        
+    return sparsity, total_weights

@@ -12,18 +12,37 @@ import numpy as np
 import mnist_loader
 
 
+def prune_around(net, weight):
+   
+    pnet = net.copy()
+    for i in range(len(net.weights)):
+        pnet.weights[i][(net.weights[i] > -weight) & (net.weights[i] < weight)] = 0.0
+        
+    training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
+    training_data = list(training_data)
+    test_data = list(test_data)
+    validation_data = list(validation_data)
+    
+    acc = pnet.evaluate(validation_data) / len(validation_data)
+    sparsity = 0
+    for i in range(hidden_layers+1):
+        sparsity += len(pnet.weights[i][pnet.weights[i] == 0.0])
+    
+    print(acc, '% for sparsity ', sparsity)
+    
+    return pnet
 
 
-
-def prune_retrain_alt(net, start=0.3, threshold=0.001):
+def prune_retrain_alt(net, start=0.3, threshold=0.001, increment=0.3):
     pnet = net.copy()
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
     training_data = list(training_data)
     test_data = list(test_data)
+    validation_data = list(validation_data)
 
 
     region = start
-    acc = net.evaluate(test_data) / len(test_data) #gonna use the same test data each time?
+    acc = net.evaluate(validation_data) / len(validation_data)
     d_acc = 0
     next_net = network.Network(net.sizes)
     next_net.weights = pnet.weights
@@ -48,15 +67,15 @@ def prune_retrain_alt(net, start=0.3, threshold=0.001):
     
         next_net.weights = fin
     
-        new_acc = next_net.evaluate(test_data) / len(test_data)
+        new_acc = next_net.evaluate(validation_data) / len(validation_data)
         d_acc = acc - new_acc
         print(new_acc, " around region ±", region)
         acc = new_acc
-        region+=start
+        region+=increment
         
     
     
-    pnet.SGD(training_data, 5, 10, 3.0)
+    pnet.SGD(training_data, 3, 10, 3.0)
     ''' f = open("wsp1.txt", "a")
     g = open("wsp2.txt", "a")
         
@@ -74,12 +93,20 @@ def prune_retrain_alt(net, start=0.3, threshold=0.001):
     h.close()
     i.close() '''
         
-    print("Epoch with pruned weights around {}: {} / {}".format(region - start, pnet.evaluate(test_data),len(test_data)));       
-    weights10 = pnet.weights[0]
-    weights11 = pnet.weights[1]
-    r = len(weights10[weights10 == 0.0]) + len(weights11[weights11 == 0.0])
-    if len(pnet.weights) > 2:
-        weights12 = pnet.weights[2]
-        r+= len(weights12[weights12 == 0.0])
-    print("sparsity: " , r, " / 23820 = "  , (r/23820) * 100 , "%" )
+    print("Epoch with pruned weights around {}: {} / {}".format(region - increment, pnet.evaluate(test_data),len(test_data)))       
+    r, total = get_sparsity(pnet)
+    print("sparsity: " , r, " / ", total, " = "  , (r/total) * 100 , "%" )
     return pnet
+
+
+
+def get_sparsity(net):
+    sparsity = 0
+    total_weights = 0
+    for i in range(len(net.weights)):
+        layer = net.weights[i]
+        sparsity += len(layer[layer == 0.0])
+        total_weights += len(layer.flatten())
+
+        
+    return sparsity, total_weights
