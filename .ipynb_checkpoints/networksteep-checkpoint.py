@@ -23,7 +23,7 @@ import numpy as np
 class Network(object):
     
 
-    def __init__(self, sizes):
+    def __init__(self, sizes, return_vector=False):
         """The list ``sizes`` contains the number of neurons in the
         respective layers of the network.  For example, if the list
         was [2, 3, 1] then it would be a three-layer network, with the
@@ -40,6 +40,7 @@ class Network(object):
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x)
                         for x, y in zip(sizes[:-1], sizes[1:])]
+        self.return_vector = return_vector
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
@@ -83,59 +84,49 @@ class Network(object):
             else:
                 print("Epoch {} complete".format(j))
             
-        '''   
-        f = open("ws1.txt", "a")
-        g = open("ws2.txt", "a")
-        
-        h = open("bs1.txt", "a")
-        i = open("bs2.txt", "a")
-       
-        np.savetxt(f, self.weights[0])
-        np.savetxt(g, self.weights[1])
-        
-        np.savetxt(h, self.biases[0])
-        np.savetxt(i, self.biases[1])
       
-        f.close()
-        g.close()
-        h.close()
-        i.close()
-        '''
+    def SGD_special(self, training_data, epochs, mini_batch_size, eta,
+            test_data=None):
         
+        training_data = list(training_data)
+        n = len(training_data)
         
-       
-        '''
-        x = [0.001, 0.005, 0.01, 0.05, 0.1]
-        
-        for i in range(len(x)):
-        
-            weights10 = self.weights[0].copy()
-            weights10[(weights10 > -x[i]) & (weights10 <= x[i])] = 0.0
-            weights11 = self.weights[1].copy()
-            weights11[(weights11 > -x[i]) & (weights11 <= x[i])] = 0.0
+        if test_data:
+            test_data = list(test_data)
+            n_test = len(test_data)
             
-            self.weights = [weights10, weights11]
-            print("Epoch with dropped weights around {}: {} / {}".format(x[i], self.evaluate(test_data),n_test));
-            r = len(weights10[weights10 == 0.0]) + len(weights11[weights11 == 0.0])
-            print("sparsity: " , r, " / 23820 = "  , (r/23820) * 100 , "%" )
-            #maybe retrain after this? several times? would zero weights stay zero
-            #prune until you notice the effect and retrain?
             
-            #also add checkpointing
-            
-        f = open("ws1.txt", "a")
-        g = open("ws2.txt", "a")
-        
-       
-        np.savetxt(f, self.weights[0])
-        np.savetxt(g, self.weights[1])
-      
-        f.close()
-        g.close()
-        
-    
-        '''
+      # np.savetxt(ws.txt, self.weights)
+      # np.savetxt(bx.txt, self.biases)
+        last_acc = 0.9
 
+        for j in range(epochs):
+            
+            self.steepener+=1
+            random.shuffle(training_data)
+            mini_batches = [
+                training_data[k:k+mini_batch_size]
+                for k in range(0, n, mini_batch_size)]
+            for mini_batch in mini_batches:
+                self.update_mini_batch(mini_batch, eta, drop_in=drop_in)
+            if test_data:
+                new_acc = self.evaluate(test_data)
+                print("Epoch {} : {} / {}".format(j,new_acc,n_test))
+                if(last_acc - new_acc > 0.08):
+                    self.sizes[1] += 1
+                    self.weights[0].append(np.random.rand(784) * 0.001)
+                    self.weights[1].append(np.random.rand(784) * 0.001)
+                    self.biases[0].append(np.random.rand(784))
+                    self.biases[1].append(np.random.rand(784))
+                    
+                    #then sparsen
+                    
+                    j -= 1
+                    self.steepener -= 1
+            else:
+                print("Epoch {} complete".format(j))
+        
+        
     def update_mini_batch(self, mini_batch, eta, drop_in=False, track=None):
         """Update the network's weights and biases by applying
         gradient descent using backpropagation to a single mini batch.
@@ -181,18 +172,12 @@ class Network(object):
             activations.append(activation)
         # backward pass
         delta = self.cost_derivative(activations[-1], y) * \
-            sigmoid_prime(zs[-1])
+            sigmoid_prime(zs[-1], self.steepener)
         nabla_b[-1] = delta
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
-        # Note that the variable l in the loop below is used a little
-        # differently to the notation in Chapter 2 of the book.  Here,
-        # l = 1 means the last layer of neurons, l = 2 is the
-        # second-last layer, and so on.  It's a renumbering of the
-        # scheme in the book, used here to take advantage of the fact
-        # that Python can use negative indices in lists.
         for l in range(2, self.num_layers):
             z = zs[-l]
-            sp = sigmoid_prime(z)
+            sp = sigmoid_prime(z, self.steepener)
             delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
             nabla_b[-l] = delta
             nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
@@ -203,7 +188,11 @@ class Network(object):
         network outputs the correct result. Note that the neural
         network's output is assumed to be the index of whichever
         neuron in the final layer has the highest activation."""
-        test_results = [(np.argmax(self.feedforward(x)), y)
+        if self.return_vector:
+            test_results = [(np.argmax(self.feedforward(x)), np.argmax(y)) for (x,y) in test_data]
+
+        else:
+            test_results = [(np.argmax(self.feedforward(x)), y)
                         for (x, y) in test_data]
         return sum(int(x == y) for (x, y) in test_results)
 
@@ -226,6 +215,6 @@ def sigmoid(z, step):
         return 1 * (z > 0)
     return 1.0/(1.0+np.exp(- z * step))
 
-def sigmoid_prime(z):
+def sigmoid_prime(z,step=1):
     """Derivative of the sigmoid function."""
-    return sigmoid(z, 1)*(1-sigmoid(z, 1))
+    return sigmoid(z, step)*(1-sigmoid(z, step))

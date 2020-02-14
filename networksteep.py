@@ -23,7 +23,7 @@ import numpy as np
 class Network(object):
     
 
-    def __init__(self, sizes):
+    def __init__(self, sizes, return_vector=False):
         """The list ``sizes`` contains the number of neurons in the
         respective layers of the network.  For example, if the list
         was [2, 3, 1] then it would be a three-layer network, with the
@@ -40,6 +40,7 @@ class Network(object):
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x)
                         for x, y in zip(sizes[:-1], sizes[1:])]
+        self.return_vector = return_vector
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
@@ -171,18 +172,12 @@ class Network(object):
             activations.append(activation)
         # backward pass
         delta = self.cost_derivative(activations[-1], y) * \
-            sigmoid_prime(zs[-1])
+            sigmoid_prime(zs[-1], self.steepener)
         nabla_b[-1] = delta
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
-        # Note that the variable l in the loop below is used a little
-        # differently to the notation in Chapter 2 of the book.  Here,
-        # l = 1 means the last layer of neurons, l = 2 is the
-        # second-last layer, and so on.  It's a renumbering of the
-        # scheme in the book, used here to take advantage of the fact
-        # that Python can use negative indices in lists.
         for l in range(2, self.num_layers):
             z = zs[-l]
-            sp = sigmoid_prime(z)
+            sp = sigmoid_prime(z, self.steepener)
             delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
             nabla_b[-l] = delta
             nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
@@ -193,7 +188,11 @@ class Network(object):
         network outputs the correct result. Note that the neural
         network's output is assumed to be the index of whichever
         neuron in the final layer has the highest activation."""
-        test_results = [(np.argmax(self.feedforward(x)), y)
+        if self.return_vector:
+            test_results = [(np.argmax(self.feedforward(x)), np.argmax(y)) for (x,y) in test_data]
+
+        else:
+            test_results = [(np.argmax(self.feedforward(x)), y)
                         for (x, y) in test_data]
         return sum(int(x == y) for (x, y) in test_results)
 
@@ -216,6 +215,6 @@ def sigmoid(z, step):
         return 1 * (z > 0)
     return 1.0/(1.0+np.exp(- z * step))
 
-def sigmoid_prime(z):
+def sigmoid_prime(z,step=1):
     """Derivative of the sigmoid function."""
-    return sigmoid(z, 1)*(1-sigmoid(z, 1))
+    return sigmoid(z, step)*(1-sigmoid(z, step))

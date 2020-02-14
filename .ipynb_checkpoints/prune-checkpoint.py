@@ -9,14 +9,15 @@ Created on Sun Oct 27 21:29:42 2019
 import network
 import numpy as np
 
-import mnist_loader
 
-def prune_to(net, sparsity):
+def prune_to(net, sparsity, training_data, test_data, validation_data = None):
+    if validation_data == None:
+        validation_data = test_data
     pnet = net.copy()
-    training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
+    """training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
     training_data = list(training_data)
     test_data = list(test_data)
-    validation_data = list(validation_data)
+    validation_data = list(validation_data)"""
     
     all_weights = np.asarray([item for sublist in pnet.weights for subsub in sublist for item in subsub])
     thresh = np.percentile(np.absolute(all_weights), sparsity)
@@ -25,8 +26,8 @@ def prune_to(net, sparsity):
     for i in range(len(net.weights)):
         pnet.weights[i][(pnet.weights[i] > -thresh) & (pnet.weights[i] <= thresh)] = 0.0
    
-    new_acc = pnet.evaluate(validation_data)
-    print(new_acc, " around region ±", threshold)
+    new_acc = pnet.evaluate(validation_data) / len(validation_data)
+    print(new_acc, " around region ±", thresh)
     
     pnet.SGD(training_data, 2, 10, 3.0)
     
@@ -36,12 +37,14 @@ def prune_to(net, sparsity):
     
     return pnet
 
-def prune_retrain(net, region, threshold=0.001):
+def prune_retrain(net, region, training_data, test_data, threshold=0.001, verbose=False, validation_data = None):
+    if validation_data == None:
+        validation_data = test_data
     pnet = net.copy()
-    training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
+    """ training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
     training_data = list(training_data)
     test_data = list(test_data)
-    validation_data = list(validation_data)
+    validation_data = list(validation_data)"""
 
 
     acc = net.evaluate(test_data) / len(test_data) #gonna use the same test data each time?
@@ -73,7 +76,7 @@ def prune_retrain(net, region, threshold=0.001):
     
         new_acc = next_net.evaluate(test_data) / len(test_data)
         d_acc = acc - new_acc
-        print(new_acc, " around region ±", region)
+        print(new_acc, " around region ±", region, ', sparity = ', 100 * get_sparsity(next_net)[0]/23820 , '%')
         acc = new_acc
         region+=region
         

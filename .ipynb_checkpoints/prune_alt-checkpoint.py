@@ -69,7 +69,7 @@ def prune_retrain_alt(net, start=0.3, threshold=0.001, increment=0.3):
     
         new_acc = next_net.evaluate(validation_data) / len(validation_data)
         d_acc = acc - new_acc
-        print(new_acc, " around region ±", region)
+        print(new_acc, " around region ±", region, ', sparsity: ', get_sparsity(next_net) * 100 ,'%')
         acc = new_acc
         region+=increment
         
@@ -94,8 +94,8 @@ def prune_retrain_alt(net, start=0.3, threshold=0.001, increment=0.3):
     i.close() '''
         
     print("Epoch with pruned weights around {}: {} / {}".format(region - increment, pnet.evaluate(test_data),len(test_data)))       
-    r, total = get_sparsity(pnet)
-    print("sparsity: " , r, " / ", total, " = "  , (r/total) * 100 , "%" )
+    r = get_sparsity(pnet)
+    print("sparsity: " , r * 100 , "%" )
     return pnet
 
 
@@ -109,4 +109,4 @@ def get_sparsity(net):
         total_weights += len(layer.flatten())
 
         
-    return sparsity, total_weights
+    return sparsity/total_weights

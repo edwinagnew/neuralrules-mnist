@@ -21,7 +21,7 @@ import numpy as np
 
 class Network(object):
 
-    def __init__(self, sizes, st=1):
+    def __init__(self, sizes, st=1, return_vector=False):
         """The list ``sizes`` contains the number of neurons in the
         respective layers of the network.  For example, if the list
         was [2, 3, 1] then it would be a three-layer network, with the
@@ -38,6 +38,7 @@ class Network(object):
         self.weights = [np.random.randn(y, x)
                         for x, y in zip(sizes[:-1], sizes[1:])]
         self.step = st
+        self.return_vector = return_vector
 
     def feedforward(self, a):
         """Return the output of the network if ``a`` is input."""
@@ -134,7 +135,11 @@ class Network(object):
         network outputs the correct result. Note that the neural
         network's output is assumed to be the index of whichever
         neuron in the final layer has the highest activation."""
-        test_results = [(np.argmax(self.feedforward(x)), y)
+        if self.return_vector:
+            test_results = [(np.argmax(self.feedforward(x)), np.argmax(y)) for (x,y) in test_data]
+
+        else:
+            test_results = [(np.argmax(self.feedforward(x)), y)
                         for (x, y) in test_data]
         return sum(int(x == y) for (x, y) in test_results)
 
@@ -153,7 +158,6 @@ class Network(object):
 def sigmoid(z, step=1):
     """The sigmoid function."""
     if step == 30:
-        #might it make a signficant difference if this was z>=0?
         return 1 * (z > 0)
     return 1.0/(1.0+np.exp(step * -z))
 
