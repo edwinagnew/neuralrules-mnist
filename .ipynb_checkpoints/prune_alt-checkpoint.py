@@ -14,7 +14,9 @@ import mnist_loader
 
 def prune_around(net, weight):
    
-    pnet = net.copy()
+    pnet = network.Network(net.sizes, return_vector = net.return_vector)
+    pnet.weights = net.weights
+    pnet.biases = net.biases
     for i in range(len(net.weights)):
         pnet.weights[i][(net.weights[i] > -weight) & (net.weights[i] < weight)] = 0.0
         
@@ -34,7 +36,9 @@ def prune_around(net, weight):
 
 
 def prune_retrain_alt(net, start=0.3, threshold=0.001, increment=0.3):
-    pnet = net.copy()
+    pnet = network.Network(net.sizes, return_vector = net.return_vector)
+    pnet.weights = net.weights
+    pnet.biases = net.biases
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
     training_data = list(training_data)
     test_data = list(test_data)

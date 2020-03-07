@@ -13,7 +13,9 @@ import numpy as np
 def prune_to(net, sparsity, training_data, test_data, validation_data = None):
     if validation_data == None:
         validation_data = test_data
-    pnet = net.copy()
+    pnet = network.Network(net.sizes, return_vector = net.return_vector)
+    pnet.weights = net.weights
+    pnet.biases = net.biases
     """training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
     training_data = list(training_data)
     test_data = list(test_data)
@@ -33,35 +35,36 @@ def prune_to(net, sparsity, training_data, test_data, validation_data = None):
     
     sp, total = get_sparsity(pnet)
     print("sparsity: ", sp/total)
-    print("Epoch with pruned weights around {}: {} / {}".format(thresh, pnet.evaluate(validation_data),len(validation_data))) 
+    print("Epoch with pruned weights around {}: {} / {}".format(thresh, pnet.evaluate(test_data),len(test_data))) 
     
     return pnet
 
 def prune_retrain(net, region, training_data, test_data, threshold=0.001, verbose=False, validation_data = None):
     if validation_data == None:
         validation_data = test_data
-    pnet = net.copy()
+    pnet = network.Network(net.sizes, return_vector=net.return_vector)
+    pnet.weights = net.weights
+    pnet.biases = net.biases
     """ training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
     training_data = list(training_data)
     test_data = list(test_data)
     validation_data = list(validation_data)"""
 
-
-    acc = net.evaluate(test_data) / len(test_data) #gonna use the same test data each time?
+    acc = pnet.evaluate(validation_data)
     d_acc = 0
-    next_net = network.Network(net.sizes)
+    next_net = network.Network(net.sizes, return_vector=net.return_vector)
     print(next_net.sizes, pnet.sizes)
     next_net.weights = pnet.weights
     next_net.biases = pnet.biases
 
-    print(acc, " without prune")
+    print(acc, "/", len(validation_data) , " without prune")
     
     while(d_acc < threshold):
         pnet.weights = next_net.weights
         pnet.biases = next_net.biases
        
 
-        weights10 = pnet.weights[0].copy()
+        """ weights10 = pnet.weights[0].copy()
         weights10[(weights10 > -region) & (weights10 <= region)] = 0.0
         weights11 = pnet.weights[1].copy()
         weights11[(weights11 > -region) & (weights11 <= region)] = 0.0
@@ -70,49 +73,44 @@ def prune_retrain(net, region, training_data, test_data, threshold=0.001, verbos
         if len(pnet.weights) > 2:
             weights12 = pnet.weights[2].copy()
             weights12[(weights12 > -region) & (weights12 <= region)] = 0.0
-            fin.append(weights12)
-    
+            fin.append(weights12)"""
+        
+        fin = []
+        for i in range(len(pnet.weights)):
+            temp_weights = pnet.weights[i]
+            temp_weights[(temp_weights >- region) & (temp_weights <= region)] = 0.0
+            fin.append(temp_weights)
+            #print("pruned " ,len(temp_weights[temp_weights == 0.0]))
+        
         next_net.weights = fin
-    
-        new_acc = next_net.evaluate(test_data) / len(test_data)
-        d_acc = acc - new_acc
-        print(new_acc, " around region ±", region, ', sparity = ', 100 * get_sparsity(next_net)[0]/23820 , '%')
+        
+        
+        new_acc = next_net.evaluate(validation_data)
+        d_acc = (acc - new_acc)/len(validation_data)
+        sparsity = get_sparsity(next_net)
+        if sparsity[0] == sparsity[1]: 
+            print("warning you've reached 100% sparsity")
+            break
+        print(new_acc, "/", len(validation_data) , " around region ±", region, ', sparsity = ', 100 * sparsity[0]/sparsity[1] , '%')
         acc = new_acc
         region+=region
         
     
     
     pnet.SGD(training_data, 2, 10, 3.0)
-    ''' f = open("wsp1.txt", "a")
-    g = open("wsp2.txt", "a")
-        
-    h = open("bs1p.txt", "a")
-    i = open("bs2p.txt", "a")
-       
-    np.savetxt(f, net.weights[0])
-    np.savetxt(g, net.weights[1])
-    
-    np.savetxt(h, net.biases[0])
-    np.savetxt(i, net.biases[1])
-    
-    f.close()
-    g.close()
-    h.close()
-    i.close() '''
-        
+
     print("Epoch with pruned weights around {}: {} / {}".format(region/2, pnet.evaluate(test_data),len(test_data)));       
     r, total = get_sparsity(pnet)
     print("sparsity: " , r, " / " , total, " = "  , (r/total) * 100 , "%" )
     return pnet
     
 
-def get_sparsity(net):
+def get_sparsity(netp):
     sparsity = 0
     total_weights = 0
-    for i in range(len(net.weights)):
-        layer = net.weights[i]
+    for i in range(len(netp.weights)):
+        layer = netp.weights[i]
         sparsity += len(layer[layer == 0.0])
         total_weights += len(layer.flatten())
 
-        
     return sparsity, total_weights

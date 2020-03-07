@@ -86,7 +86,7 @@ class Network(object):
             
       
     def SGD_special(self, training_data, epochs, mini_batch_size, eta,
-            test_data=None):
+            test_data=None): #WHAT??
         
         training_data = list(training_data)
         n = len(training_data)
