@@ -94,8 +94,8 @@ class Network(object):
                 self.update_mini_batch(mini_batch, eta)
             if test_data:
                 print("Epoch {} : {} / {}".format(j,self.evaluate(test_data),n_test));
-            else:
-                print("Epoch {} complete".format(j))
+            #else:
+            #    print("Epoch {} complete".format(j))
 
     def update_mini_batch(self, mini_batch, eta):
         """Update the network's weights and biases by applying
