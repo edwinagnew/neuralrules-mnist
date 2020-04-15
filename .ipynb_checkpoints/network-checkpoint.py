@@ -87,6 +87,7 @@ class Network(object):
 
         for j in range(epochs):
             random.shuffle(training_data)
+            #print(training_data[:5])
             mini_batches = [
                 training_data[k:k+mini_batch_size]
                 for k in range(0, n, mini_batch_size)]
@@ -151,6 +152,7 @@ class Network(object):
             sp = sigmoid_prime(z)
             delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
             nabla_b[-l] = delta
+            #print("shapes: ", delta.shape, activations[-l-1].shape)
             nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
         return (nabla_b, nabla_w)
 
@@ -164,7 +166,7 @@ class Network(object):
                 test_results = [(np.argmax(self.feedforward(x)), np.argmax(y)) for (x,y) in test_data]
                 
             else:
-                test_results = [( self.feedforward(x) > self.threshold, y) for (x,y) in test_data]
+                test_results = [( int(self.feedforward(x) > self.threshold), y) for (x,y) in test_data]
 
         else:
             test_results = [(np.argmax(self.feedforward(x)), y)
